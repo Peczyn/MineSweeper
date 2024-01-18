@@ -108,11 +108,20 @@ int main() {
 
                 box.setPosition((szerokosc_kratki+display.getSize().x-(szerokosc_kratki+odstep_miedzy_kratkami)*test[0].size())/2+j*(szerokosc_kratki+odstep_miedzy_kratkami),(szerokosc_kratki+display.getSize().x-(szerokosc_kratki+odstep_miedzy_kratkami)*test.size())/2+ i*(szerokosc_kratki+odstep_miedzy_kratkami));
                 box.setFillColor(sf::Color(0x515151FF));
-                if(a->wartosc == 0) mineNumber.setFillColor(sf::Color::Green);
-                if(a->wartosc >  0 && a->wartosc < 20) mineNumber.setFillColor(sf::Color::Blue);
+                if(a->wartosc == 0)
+                {
+                    mineNumber.setFillColor(sf::Color(0x80CFA9FF));
+                    box.setFillColor(sf::Color(0xB4D2BAFF));
+
+                }
+                if(a->wartosc >  0 && a->wartosc < 20)
+                {
+                    mineNumber.setFillColor(sf::Color(0x5C95FFFF));
+                    box.setFillColor(sf::Color(0x9EB3C2FF));
+                }
                 if(a->wartosc > 20)
                 {
-                    mineNumber.setFillColor(sf::Color::Red);
+                    mineNumber.setFillColor(sf::Color(0x33312EFF));
                     box.setFillColor(sf::Color(0x580C1FFF));
                 }
 
