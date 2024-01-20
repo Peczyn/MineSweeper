@@ -26,7 +26,7 @@ sf::Color color2(0x1A936FFF);
 sf::Color color3(0xB80C09FF);
 sf::Color color4(0x2708A0FF);
 sf::Color color5(0x653239FF);
-sf::Color color6(0xB287A4FF);
+sf::Color color6(0xB287A5FF);
 sf::Color color7(0xF4442EFF);
 sf::Color color8(0xF0E2A3FF);
 sf::Color colorMine(0xA61C3CFF);
