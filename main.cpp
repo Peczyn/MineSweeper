@@ -1,3 +1,10 @@
+/*
+ * One of my first projects ever and still learning SFML
+ * You can highlight a field by right-clicking
+ * By leftclicking you show the field
+ * If you shown all the emty fields you win
+ */
+
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include <cmath>
@@ -5,15 +12,15 @@
 
 using namespace std;
 
-class Pole{
+class Field{
 public:
-    int wartosc;
-    bool czyJestMina;
-    bool czyByloOdsloniete;
-    bool czyZaznaczonaMina;
+    int value;
+    bool isMined;
+    bool wasShown;
+    bool wasHighlited;
 
-    Pole(){}
-    Pole(bool x): czyJestMina(x),wartosc(0),czyByloOdsloniete(false),czyZaznaczonaMina(false){}
+    Field()= default;
+    explicit Field(bool x): isMined(x),value(0),wasShown(false),wasHighlited(false){}
 };
 
 sf::RenderWindow display(sf::VideoMode(600,600),"Saper");
@@ -31,63 +38,47 @@ sf::Color color7(0xF4442EFF);
 sf::Color color8(0xF0E2A3FF);
 sf::Color colorMine(0xA61C3CFF);
 
-sf::Color colorZasloniete(0xFF);
+sf::Color colorHidden(0xFF);
 
-
-
-
-vector<vector<Pole>> createMineMap(int x, int y, int &licznik);
-void checkForMinesMap(vector<vector<Pole>> &mineMap);
-
+vector<vector<Field>> createMineMap(int x, int y, int &mineCounter);
+void checkForMinesMap(vector<vector<Field>> &mineMap);
 void centerTextOrigin(sf::Text &text);
-bool containsMouse(sf::RectangleShape box,sf::Vector2i coords);
-
-void sprawdzCzyOdsloniete(vector<vector<Pole>> &test, int i, int j);
-
-
-
-
+bool containsMouse(const sf::RectangleShape& box,sf::Vector2i coords);
+void checkIfFieldShown(vector<vector<Field>> &test, int i, int j);
 
 int main() {
     display.setFramerateLimit(240);
 
+    int mapWidth = 15;
+    int mapHeigth = 15;
 
-    int mapaSzerokosc = 6;
-    int mapaWysokosc = 6;
+    int spaceBetweenFields = 1;
+    int fieldSize = min(display.getSize().x/(mapWidth+spaceBetweenFields*0.1*mapWidth),display.getSize().y/(mapHeigth+spaceBetweenFields*0.1*mapHeigth));
 
-    int odstep_miedzy_kratkami = 1;
-    int szerokosc_kratki = min(display.getSize().x/(mapaSzerokosc+odstep_miedzy_kratkami*0.1*mapaSzerokosc),display.getSize().y/(mapaWysokosc+odstep_miedzy_kratkami*0.1*mapaWysokosc));
+    int mineCounter = 0;
 
-
-    int licznikMin = 0;
-
-
-
-
-    vector<vector<Pole>> test = createMineMap(mapaSzerokosc,mapaWysokosc,licznikMin);
-    checkForMinesMap(test);
-
+    vector<vector<Field>> mineField = createMineMap(mapWidth,mapHeigth,mineCounter);
+    checkForMinesMap(mineField);
 
 
     sf::Font font;
     if (!font.loadFromFile("../cmake-build-debug/Pixelboy.ttf")) {
         std::cerr << "Cannot load font" << std::endl;
-        return 0;
+        return 1;
     }
     font.setSmooth(false);
 
 
-
-    sf::RectangleShape box(sf::Vector2f(szerokosc_kratki,szerokosc_kratki));
+    sf::RectangleShape box(sf::Vector2f(fieldSize,fieldSize));
     box.setFillColor(sf::Color::Blue);
-    box.setOrigin(szerokosc_kratki/2,szerokosc_kratki/2);
+    box.setOrigin(fieldSize/2,fieldSize/2);
 
-    sf::Text mineNumber("0", font, szerokosc_kratki);
+    sf::Text mineNumber("0", font, fieldSize);
     centerTextOrigin(mineNumber);
     mineNumber.setOutlineThickness(1.5f);
     mineNumber.setOutlineColor(sf::Color::Black);
 
-    sf::Text ZaminowanePoleText("X", font, szerokosc_kratki);
+    sf::Text ZaminowanePoleText("X", font, fieldSize);
     ZaminowanePoleText.setFillColor(sf::Color::Red);
     centerTextOrigin(ZaminowanePoleText);
     ZaminowanePoleText.setOutlineThickness(0.5f);
@@ -105,20 +96,16 @@ int main() {
     GameOverText.setOutlineThickness(2.f);
     GameOverText.setOutlineColor(sf::Color::Black);
 
-
-
     sf::Vector2i MouseCoordsLeftClick;
     sf::Vector2i MouseCoordsRightClick;
 
-
-    sf::Clock zegar;
     bool GameOver = false;
     bool GameWin = false;
 
     bool Menu = true;
     bool Playing = false;
 
-    int licznikOdslonietychPol;
+    int shownTilesCounter;
     while(display.isOpen())
     {
         display.clear();
@@ -129,11 +116,7 @@ int main() {
 
             if(event.type == sf::Event::MouseButtonPressed && sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) MouseCoordsLeftClick = sf::Mouse::getPosition(display);
             if(event.type == sf::Event::MouseButtonPressed && sf::Mouse::isButtonPressed(sf::Mouse::Button::Right)) MouseCoordsRightClick = sf::Mouse::getPosition(display);
-
         }
-
-
-        licznikOdslonietychPol = 0;
 
         if(Menu)
         {
@@ -144,56 +127,56 @@ int main() {
             Playing = true;
         }
 
+        shownTilesCounter = 0;
         if(Playing) {
-            //Sprawdzanie wartosci pol oraz wypisywanie ich
-            for (int i = 0; i < test.size(); i++) {
-                for (int j = 0; j < test[0].size(); j++) {
-                    auto a = &test[i][j];
+            //Checking fields value and showing them
+            for (int i = 0; i < mineField.size(); i++) {
+                for (int j = 0; j < mineField[0].size(); j++) {
+                    auto a = &mineField[i][j];
 
-                    box.setPosition((szerokosc_kratki + display.getSize().x -
-                                     (szerokosc_kratki + odstep_miedzy_kratkami) * test[0].size()) / 2 +
-                                    j * (szerokosc_kratki + odstep_miedzy_kratkami),
-                                    (szerokosc_kratki + display.getSize().x -
-                                     (szerokosc_kratki + odstep_miedzy_kratkami) * test.size()) / 2 +
-                                    i * (szerokosc_kratki + odstep_miedzy_kratkami));
+                    box.setPosition((fieldSize + display.getSize().x -
+                                     (fieldSize + spaceBetweenFields) * mineField[0].size()) / 2 +
+                                    j * (fieldSize + spaceBetweenFields),
+                                    (fieldSize + display.getSize().x -
+                                     (fieldSize + spaceBetweenFields) * mineField.size()) / 2 +
+                                    i * (fieldSize + spaceBetweenFields));
                     box.setFillColor(sf::Color(0x515151FF));
 
-
-                    //Ustawianie koloru boxa i tekstu w zaleznosci od numeru pola
-                    if (a->wartosc == 0) {
+                    //Setting field color and text value
+                    if (a->value == 0) {
                         mineNumber.setFillColor(color0);
                         box.setFillColor(color0);
 
                     }
-                    else if (a->wartosc == 1) {
+                    else if (a->value == 1) {
                         mineNumber.setFillColor(color1);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 2) {
+                    else if (a->value == 2) {
                         mineNumber.setFillColor(color2);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 3) {
+                    else if (a->value == 3) {
                         mineNumber.setFillColor(color3);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 4) {
+                    else if (a->value == 4) {
                         mineNumber.setFillColor(color4);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 5) {
+                    else if (a->value == 5) {
                         mineNumber.setFillColor(color5);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 6) {
+                    else if (a->value == 6) {
                         mineNumber.setFillColor(color6);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 7) {
+                    else if (a->value == 7) {
                         mineNumber.setFillColor(color7);
                         box.setFillColor(color0);
                     }
-                    else if (a->wartosc == 8) {
+                    else if (a->value == 8) {
                         mineNumber.setFillColor(color8);
                         box.setFillColor(color0);
                     }
@@ -204,55 +187,49 @@ int main() {
                     }
 
 
-                    //Ustawianie wypisywanej wartosci dla danego pola
-                    if (a->wartosc == 0) mineNumber.setString(" ");
-                    else if (a->wartosc > 0 && a->wartosc < 20) mineNumber.setString(to_string(a->wartosc));
+
+                    //Setting value for field
+                    if (a->value == 0) mineNumber.setString(" ");
+                    else if (a->value > 0 && a->value < 20) mineNumber.setString(to_string(a->value));
                     else mineNumber.setString("*");
 
 
-                    //Sprawdzenie czy pole zostalo odsloniete
+                    //Checking if field was shown
                     if (containsMouse(box, MouseCoordsLeftClick)) {
-                        if (a->czyJestMina) GameOver = true;
+                        if (a->isMined) GameOver = true;
 
-                        a->czyByloOdsloniete = true;
-                        a->czyZaznaczonaMina = false;
+                        a->wasShown = true;
+                        a->wasHighlited = false;
                     }
 
-                    //Sprawdzenie czy pole zsotalo zaznaczone jako mina
-                    if (containsMouse(box, MouseCoordsRightClick) && !a->czyByloOdsloniete) {
-                        a->czyZaznaczonaMina = !a->czyZaznaczonaMina;
+                    //Checking if field was highligthed
+                    if (containsMouse(box, MouseCoordsRightClick) && !a->wasShown) {
+                        a->wasHighlited = !a->wasHighlited;
                         MouseCoordsRightClick = sf::Vector2i();
                     }
 
-
-                    //Jezeli odsloniete pole == 0 to wtedy sasiednie pola tez zostaja odsloniete
-                    if (test[i][j].wartosc == 0 && test[i][j].czyByloOdsloniete) {
-                        sprawdzCzyOdsloniete(test, i, j);
+                    //If field was shown and it's value is 0 then show all alied fields with value 0
+                    if (mineField[i][j].value == 0 && mineField[i][j].wasShown) {
+                        checkIfFieldShown(mineField, i, j);
                     }
 
 
-                    //Wypisywanie dolnej warstwy
+                    //Drawing lower fields
                     mineNumber.setPosition(box.getPosition());
                     display.draw(box);
                     display.draw(mineNumber);
 
 
-                    //Wypisywanie gornej warstwy
+                    //Drawing over layer
                     ZaminowanePoleText.setPosition(box.getPosition());
 
-
-
-
-                    //Ustawiamy bazowy kolor gornej warstwy
+                    //Over layer color set
                     box.setFillColor(sf::Color(0x222222FF));
 
-                    //Jesli pole bylo odsloniete to kolor boxa transparentny
-                    if (test[i][j].czyByloOdsloniete) box.setFillColor(sf::Color::Transparent);
+                    //If field was shown then make it's over layer transparent
+                    if (mineField[i][j].wasShown) box.setFillColor(sf::Color::Transparent);
 
-
-
-
-                    //Wyswietlanie Game Over/ Game Win
+                    //GameOver/Win
                     if (!GameOver) {
                         display.draw(box);
                     } else if (!GameWin) {
@@ -261,42 +238,39 @@ int main() {
                         display.draw(CongratulationsText);
                     }
 
-                    //Jezeli zaznaczona mina to wypisze znaczek zaznaczonej miny
-                    if (test[i][j].czyZaznaczonaMina) display.draw(ZaminowanePoleText);
-                    if (test[i][j].czyByloOdsloniete) licznikOdslonietychPol++;
+                    //Highligthing a field
+                    if (mineField[i][j].wasHighlited) display.draw(ZaminowanePoleText);
+                    if (mineField[i][j].wasShown) shownTilesCounter++;
 
-                    //Sprawdzamy czy wszystkie wymagane pola zostaly odkryte
-                    if (licznikOdslonietychPol == test.size() * test[0].size() - licznikMin && !GameOver)
+                    //Check if game is won
+                    if (shownTilesCounter == mineField.size() * mineField[0].size() - mineCounter && !GameOver)
                         GameWin = GameOver = true;
                 }
             }
         }
-
-
         display.display();
     }
-
     return 0;
 }
 
 
 
-vector<vector<Pole>> createMineMap(int x, int y, int &licznik)
+vector<vector<Field>> createMineMap(int x, int y, int &mineCounter)
 {
-    vector<vector<Pole>> map;
-    srand(time(NULL));
+    vector<vector<Field>> map;
+    srand(time(nullptr));
     for(int i = 0; i < y ; i++)
     {
-        vector<Pole> row;
+        vector<Field> row;
         for(int j = 0; j < x ; j++)
         {
 
             if(rand()%10==0)
             {
-                row.push_back(Pole(true));
-                licznik++;
+                row.push_back(Field(true));
+                mineCounter++;
             }
-            else row.push_back(Pole(false));
+            else row.push_back(Field(false));
         }
         map.push_back(row);
     }
@@ -304,7 +278,7 @@ vector<vector<Pole>> createMineMap(int x, int y, int &licznik)
 }
 
 
-void checkForMinesMap(vector<vector<Pole>> &mineMap)
+void checkForMinesMap(vector<vector<Field>> &mineMap)
 {
     int x = mineMap[0].size();
     int y = mineMap.size();
@@ -315,59 +289,58 @@ void checkForMinesMap(vector<vector<Pole>> &mineMap)
     {
         for(int j = 0; j < x; j++)
         {
-            if(!mineMap[i][j].czyJestMina) continue;
+            if(!mineMap[i][j].isMined) continue;
 
 
-            mineMap[i][j].wartosc=222;
+            mineMap[i][j].value=222;
 
 
             if(i!=0 && j!=0)
             {
-                mineMap[i-1][j-1].wartosc++;
+                mineMap[i-1][j-1].value++;
             }
 
             if(i!=0)
             {
-                mineMap[i-1][j].wartosc++;
+                mineMap[i-1][j].value++;
             }
 
             if(j!=0)
             {
-                mineMap[i][j-1].wartosc++;
+                mineMap[i][j-1].value++;
             }
 
 
 
             if(i!=y-1 && j!=x-1)
             {
-                mineMap[i+1][j+1].wartosc++;
+                mineMap[i+1][j+1].value++;
             }
 
             if(i!=y-1)
             {
-                mineMap[i+1][j].wartosc++;
+                mineMap[i+1][j].value++;
             }
 
             if(j!=x-1)
             {
-                mineMap[i][j+1].wartosc++;
+                mineMap[i][j+1].value++;
             }
 
 
 
             if(i!=0 && j!=x-1)
             {
-                mineMap[i-1][j+1].wartosc++;
+                mineMap[i-1][j+1].value++;
             }
 
             if(i!=y-1 && j!=0)
             {
-                mineMap[i+1][j-1].wartosc++;
+                mineMap[i+1][j-1].value++;
             }
 
         }
     }
-    return;
 }
 
 
@@ -378,55 +351,55 @@ void centerTextOrigin(sf::Text &text)
 }
 
 
-bool containsMouse(sf::RectangleShape box,sf::Vector2i coords)
+bool containsMouse(const sf::RectangleShape& box,sf::Vector2i coords)
 {
     if(sf::Rect(box.getGlobalBounds()).contains(coords.x, coords.y)) return true;
     return false;
 }
 
-void sprawdzCzyOdsloniete(vector<vector<Pole>> &test, int i, int j)
+void checkIfFieldShown(vector<vector<Field>> &test, int i, int j)
 {
-    if(i!=0 && j!=0 && !test[i-1][j-1].czyJestMina)
+    if(i!=0 && j!=0 && !test[i-1][j-1].isMined)
     {
-        test[i-1][j-1].czyByloOdsloniete = true;
+        test[i-1][j-1].wasShown = true;
     }
 
-    if(i!=0  && !test[i-1][j].czyJestMina)
+    if(i!=0  && !test[i-1][j].isMined)
     {
-        test[i-1][j].czyByloOdsloniete = true;
+        test[i-1][j].wasShown = true;
     }
 
-    if(j!=0  && !test[i][j-1].czyJestMina)
+    if(j!=0  && !test[i][j-1].isMined)
     {
-        test[i][j-1].czyByloOdsloniete = true;
-    }
-
-
-
-    if(i!=test.size()-1 && j!=test[0].size()-1  && !test[i+1][j+1].czyJestMina)
-    {
-        test[i+1][j+1].czyByloOdsloniete = true;
-    }
-
-    if(i!=test.size()-1 && !test[i+1][j].czyJestMina)
-    {
-        test[i+1][j].czyByloOdsloniete = true;
-    }
-
-    if(j!=test[0].size()-1 && !test[i][j+1].czyJestMina)
-    {
-        test[i][j+1].czyByloOdsloniete = true;
+        test[i][j-1].wasShown = true;
     }
 
 
 
-    if(i!=0 && j!=test[0].size()-1 && !test[i-1][j+1].czyJestMina)
+    if(i!=test.size()-1 && j!=test[0].size()-1  && !test[i+1][j+1].isMined)
     {
-        test[i-1][j+1].czyByloOdsloniete = true;
+        test[i+1][j+1].wasShown = true;
     }
 
-    if(i!=test.size()-1 && j!=0 && !test[i+1][j-1].czyJestMina)
+    if(i!=test.size()-1 && !test[i+1][j].isMined)
     {
-        test[i+1][j-1].czyByloOdsloniete = true;
+        test[i+1][j].wasShown = true;
+    }
+
+    if(j!=test[0].size()-1 && !test[i][j+1].isMined)
+    {
+        test[i][j+1].wasShown = true;
+    }
+
+
+
+    if(i!=0 && j!=test[0].size()-1 && !test[i-1][j+1].isMined)
+    {
+        test[i-1][j+1].wasShown = true;
+    }
+
+    if(i!=test.size()-1 && j!=0 && !test[i+1][j-1].isMined)
+    {
+        test[i+1][j-1].wasShown = true;
     }
 }
